@@ -422,11 +422,12 @@ body{
   #chart-panel{width:100%}
 
   #chart-top{
-    overflow-x:auto;padding:0 10px;gap:6px;
-    scrollbar-width:none;-ms-overflow-style:none
+    height:auto;min-height:40px;flex-wrap:wrap;overflow:visible;
+    padding:6px 10px;gap:6px 8px
   }
-  #chart-top::-webkit-scrollbar{display:none}
-  .tf-btn{padding:3px 8px;font-size:10px}
+  .tf-grp{order:20;flex:1 1 100%;margin-left:0;gap:4px}
+  .tf-btn{flex:1;padding:7px 4px;font-size:12px;text-align:center}
+  #chart-loading{order:21}
   .cstat{min-width:44px}
 
   #mobile-panel-btn{
@@ -682,7 +683,7 @@ function updateRRDisplay(){const el=document.getElementById('ef-rr');if(!el||!tr
 
 function drawTradeSetupLines(ctx,cW,cAH,lE,PW){if(!tradeSetup)return;const defs=[{key:'entry',price:tradeSetup.entry,color:'#f0b90b',label:'ENTRY'},{key:'t1',price:tradeSetup.t1,color:'#3dd68c',label:'TP'},{key:'sl',price:tradeSetup.sl,color:'#f6465d',label:'SL'}];if(tradeSetup.t2)defs.push({key:'t2',price:tradeSetup.t2,color:'rgba(61,214,140,.7)',label:'TP2'});defs.forEach(def=>{if(!def.price)return;const y=priceToY(def.price);if(y<2||y>cAH-2)return;const isDrag=tradeSetup.dragging===def.key;ctx.strokeStyle=def.color+(isDrag?'':'bb');ctx.lineWidth=isDrag?2.5:1.5;ctx.setLineDash([10,5]);ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(cW,y);ctx.stroke();ctx.setLineDash([]);const pw=108,ph=24,px=4,py=y-ph/2;ctx.fillStyle=def.color+(isDrag?'44':'22');ctx.beginPath();if(ctx.roundRect)ctx.roundRect(px,py,pw,ph,4);else ctx.rect(px,py,pw,ph);ctx.fill();ctx.strokeStyle=def.color+(isDrag?'ff':'88');ctx.lineWidth=isDrag?1.5:1;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(px,py,pw,ph,4);else ctx.rect(px,py,pw,ph);ctx.stroke();ctx.fillStyle=def.color;ctx.font='bold 10px monospace';ctx.textAlign='left';ctx.fillText(`${def.label}  ${fPS(def.price)}`,px+7,y+3.5);const gx=cW-18;ctx.fillStyle=def.color+(isDrag?'cc':'66');[-4,0,4].forEach(dy=>ctx.fillRect(gx,y+dy-0.5,12,1.5));if(isDrag){ctx.fillStyle=def.color+'cc';ctx.font='bold 9px monospace';ctx.textAlign='center';ctx.fillText('↕',cW/2,y-7);}});if(tradeSetup.entry&&tradeSetup.t1&&tradeSetup.sl){const rew=Math.abs(tradeSetup.t1-tradeSetup.entry),risk=Math.abs(tradeSetup.sl-tradeSetup.entry);if(risk>0){const rr=(rew/risk).toFixed(1),col=parseFloat(rr)>=1.5?'#3dd68c':parseFloat(rr)>=1.0?'#f0b90b':'#f6465d',ey=priceToY(tradeSetup.entry);if(ey>10&&ey<cAH-10){ctx.fillStyle='rgba(11,15,23,0.88)';ctx.beginPath();if(ctx.roundRect)ctx.roundRect(116,ey-10,68,18,4);else ctx.rect(116,ey-10,68,18);ctx.fill();ctx.fillStyle=col;ctx.font='bold 9px monospace';ctx.textAlign='left';ctx.fillText(`R/R ${rr}:1`,121,ey+3);}}}}
 function drawCrosshairLines(ctx,cW,cAH,lE,PW,slotW,H){if(cursorY<0||cursorY>cAH)return;const cp=chartHi-(cursorY/cAH)*(chartHi-chartLo);ctx.strokeStyle='rgba(210,220,235,0.4)';ctx.lineWidth=1;ctx.setLineDash([5,4]);ctx.beginPath();ctx.moveTo(0,cursorY);ctx.lineTo(cW,cursorY);ctx.stroke();if(cursorX>=0&&cursorX<=cW){ctx.strokeStyle='rgba(210,220,235,0.18)';ctx.beginPath();ctx.moveTo(cursorX,0);ctx.lineTo(cursorX,cAH);ctx.stroke();}ctx.setLineDash([]);if(cursorX>=0&&cursorX<=cW){ctx.beginPath();ctx.arc(cursorX,cursorY,3,0,Math.PI*2);ctx.fillStyle='rgba(210,220,235,0.7)';ctx.fill();}const lx=lE+1,lw=PW-2,lh=20;ctx.fillStyle='rgba(11,15,23,0.96)';ctx.beginPath();if(ctx.roundRect)ctx.roundRect(lx,cursorY-lh/2,lw,lh,3);else ctx.rect(lx,cursorY-lh/2,lw,lh);ctx.fill();ctx.strokeStyle='rgba(210,220,235,0.5)';ctx.lineWidth=1;ctx.beginPath();if(ctx.roundRect)ctx.roundRect(lx,cursorY-lh/2,lw,lh,3);else ctx.rect(lx,cursorY-lh/2,lw,lh);ctx.stroke();ctx.fillStyle='#e4eaf2';ctx.font='bold 9px monospace';ctx.textAlign='left';ctx.fillText(fPS(cp),lx+4,cursorY+3.5);if(cursorX>=0&&cursorX<=cW&&slotW>0&&candles.length>0){const visLen=Math.floor(cW/slotW),vis=candles.slice(-visLen),idx=Math.min(Math.floor(cursorX/slotW),vis.length-1),c=vis[idx];if(c){const isUp=c.c2>=c.o,cCol=isUp?'#3dd68c':'#f6465d',parts=[{l:'O',v:fmtP(c.o),col:'#96a6b8'},{l:'H',v:fmtP(c.h),col:'#3dd68c'},{l:'L',v:fmtP(c.l),col:'#f6465d'},{l:'C',v:fmtP(c.c2),col:cCol},{l:'V',v:fmtV(c.v*c.c2),col:'#96a6b8'}];ctx.font='9px monospace';let totalW=12;parts.forEach(p=>{totalW+=ctx.measureText(p.l+' '+p.v+'  ').width;});ctx.fillStyle='rgba(11,15,23,0.88)';ctx.beginPath();if(ctx.roundRect)ctx.roundRect(6,5,Math.min(totalW,cW-12),20,4);else ctx.rect(6,5,Math.min(totalW,cW-12),20);ctx.fill();let px=12;parts.forEach(p=>{ctx.fillStyle='#5e7082';ctx.textAlign='left';ctx.font='9px monospace';ctx.fillText(p.l,px,19);ctx.fillStyle=p.col;const vs=' '+p.v;ctx.fillText(vs,px+7,19);px+=7+ctx.measureText(vs+'  ').width;});}}}
-function redrawCrosshairCanvas(){const cv=document.getElementById('crosshair-cv');if(!cv)return;const{cAH,cW,lE,PW,slotW,H}=chartLayout;const ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);if(tradeSetup)drawTradeSetupLines(ctx,cW,cAH,lE,PW);if(cursorX!==null&&cursorY!==null&&cAH>1&&chartHi>0&&!tradeSetup?.dragging&&!activeLineDrag)drawCrosshairLines(ctx,cW,cAH,lE,PW,slotW,H);}
+function redrawCrosshairCanvas(){const cv=document.getElementById('crosshair-cv');if(!cv)return;const{cAH,cW,lE,PW,slotW,H}=chartLayout;const ctx=cv.getContext('2d'),dpr=Math.min(window.devicePixelRatio||1,3);ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,cv.width,cv.height);ctx.setTransform(dpr,0,0,dpr,0,0);if(tradeSetup)drawTradeSetupLines(ctx,cW,cAH,lE,PW);if(cursorX!==null&&cursorY!==null&&cAH>1&&chartHi>0&&!tradeSetup?.dragging&&!activeLineDrag)drawCrosshairLines(ctx,cW,cAH,lE,PW,slotW,H);}
 
 // ── v61: Chart interaction + pointer/touch events ────────────
 function initChartInteraction(){
@@ -891,9 +892,10 @@ function renderStats(){const{bids,asks}=book;if(!bids.length||!asks.length)retur
 function drawChart(){
   const cv=document.getElementById('chart-cv'),body=document.getElementById('chart-body');
   const W=body.offsetWidth||940,H=body.offsetHeight||700;
-  cv.width=W;cv.height=H;
-  const ccv=document.getElementById('crosshair-cv');if(ccv){ccv.width=W;ccv.height=H;}
-  const ctx=cv.getContext('2d');
+  const dpr=Math.min(window.devicePixelRatio||1,3);
+  cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
+  const ccv=document.getElementById('crosshair-cv');if(ccv){ccv.width=Math.round(W*dpr);ccv.height=Math.round(H*dpr);}
+  const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.fillStyle='#0b0f17';ctx.fillRect(0,0,W,H);
   if(!candles.length){ctx.fillStyle='#5e7082';ctx.font='13px monospace';ctx.textAlign='center';ctx.fillText('Loading chart…',W/2,H/2);return;}
   const PW=68,LW=68,TH=18,VH=Math.round(H*0.10),cW=W-PW-LW,lS=cW,lE=W-PW,cAH=H-TH-VH;
