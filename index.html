@@ -176,6 +176,7 @@ body{
 @keyframes bubPulse{0%,100%{opacity:1}50%{opacity:.4}}
 #chart-loading{font-family:var(--font-ui);font-size:10px;color:var(--text3);margin-left:2px}
 #mobile-panel-btn{display:none}
+#quick-bar{display:none}
 
 /* ── CHART BODY ──────────────────────────────── */
 #chart-body{flex:1;position:relative;overflow:hidden;cursor:crosshair;touch-action:none}
@@ -464,6 +465,25 @@ body{
   .sig-section{padding:10px 14px}
   .manual-long-btn,.manual-short-btn{padding:15px 4px;font-size:14px}
 
+  #quick-bar{
+    display:flex;flex-shrink:0;align-items:center;gap:8px;
+    padding:8px 12px calc(8px + env(safe-area-inset-bottom));
+    background:linear-gradient(180deg,var(--surface2),var(--surface));
+    border-top:1px solid var(--border2);
+    box-shadow:0 -6px 20px rgba(0,0,0,.35)
+  }
+  #quick-bar button{
+    flex:1;padding:13px 6px;border-radius:10px;border:1px solid;cursor:pointer;
+    font-family:var(--font-ui);font-size:14px;font-weight:700;letter-spacing:.4px;
+    -webkit-tap-highlight-color:transparent
+  }
+  #quick-bar button:disabled{opacity:.4}
+  #quick-bar .qb-long{background:rgba(46,160,107,.14);border-color:rgba(61,214,140,.45);color:var(--green2)}
+  #quick-bar .qb-short{background:rgba(201,58,58,.12);border-color:rgba(246,70,93,.42);color:var(--red2)}
+  #quick-bar .qb-cancel{flex:0 0 52px;background:rgba(125,136,152,.1);border-color:var(--border2);color:var(--text2)}
+  #quick-bar .qb-close{background:rgba(246,70,93,.1);border-color:rgba(246,70,93,.4);color:var(--red2)}
+  #quick-bar .qb-info{flex:1.3;text-align:center;font-family:var(--font-data);font-size:11px;font-weight:600;color:var(--text2);line-height:1.3}
+
   #log-modal{align-items:flex-end;padding:0}
   #log-panel{
     width:100%;max-height:92dvh;
@@ -584,6 +604,8 @@ body{
     </div>
   </div>
 </div>
+
+<div id="quick-bar"></div>
 
 <div id="panel-backdrop"></div>
 
@@ -972,6 +994,33 @@ document.getElementById('mobile-panel-btn').addEventListener('click',openMobileP
 document.getElementById('panel-backdrop').addEventListener('click',closeMobilePanel);
 document.getElementById('panel-handle').addEventListener('click',closeMobilePanel);
 window.addEventListener('resize',()=>{drawChart();if(window.innerWidth>768)closeMobilePanel();});
+
+// ── Mobile quick trade bar (LONG/SHORT, confirm, close — no need to open the Analysis sheet) ──
+let _qbKey='';
+function renderQuickBar(){
+  const bar=document.getElementById('quick-bar');if(!bar)return;
+  const open=!!(activeLogEntry&&!activeLogEntry.outcome);
+  const key=open?'active':(manualEntryDir!==null?'form':'idle');
+  if(key!==_qbKey){
+    _qbKey=key;
+    if(key==='idle')bar.innerHTML='<button class="qb-long" data-act="long">▲ LONG</button><button class="qb-short" data-act="short">▼ SHORT</button>';
+    else if(key==='form')bar.innerHTML='<button class="qb-cancel" data-act="cancel">✗</button><span class="qb-info" id="qb-info">Drag the lines</span><button class="qb-long" data-act="confirm">✓ CONFIRM</button>';
+    else bar.innerHTML='<span class="qb-info" id="qb-info">—</span><button class="qb-close" data-act="close">Close at market</button>';
+  }
+  const info=document.getElementById('qb-info');
+  if(info&&key==='form'&&tradeSetup){const{entry,t1,sl,dir}=tradeSetup;let t=(dir==='LONG'?'▲ LONG':'▼ SHORT');if(entry&&t1&&sl&&Math.abs(sl-entry)>0)t+=' · R/R '+(Math.abs(t1-entry)/Math.abs(sl-entry)).toFixed(1)+':1';info.textContent=t;}
+  if(info&&key==='active'&&activeLogEntry&&livePrice){const e=activeLogEntry,pp=((livePrice-e.entry)/e.entry*100)*(e.direction==='LONG'?1:-1);info.textContent=(e.direction==='LONG'?'▲ LONG ':'▼ SHORT ')+(pp>=0?'+':'')+pp.toFixed(2)+'%';info.style.color=pp>=0?'var(--green2)':'var(--red2)';}
+  bar.querySelectorAll('[data-act=long],[data-act=short]').forEach(b=>{b.disabled=!livePrice;});
+}
+document.getElementById('quick-bar').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-act]');if(!b||b.disabled)return;const a=b.dataset.act;
+  if(a==='long'||a==='short'){if(livePrice)openEntryForm(a==='long'?'LONG':'SHORT');}
+  else if(a==='confirm')confirmManualEntry();
+  else if(a==='cancel')cancelEntryForm();
+  else if(a==='close'){if(activeLogEntry&&!activeLogEntry.outcome)resolveLogEntry(activeLogEntry,'MANUAL_CLOSE',livePrice);}
+  renderQuickBar();
+});
+setInterval(renderQuickBar,300);renderQuickBar();
 
 // ── Init ──────────────────────────────────────────────────────
 loadTradeLog();
