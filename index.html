@@ -160,8 +160,12 @@ body{
   padding:4px 10px;border-radius:5px;font-family:var(--font-ui);font-size:11px;
   font-weight:500;cursor:pointer;transition:var(--trans);white-space:nowrap
 }
-.tf-btn:hover{color:var(--text);background:rgba(255,255,255,.04)}
-.tf-btn.active{background:rgba(240,185,11,.12);border-color:rgba(240,185,11,.32);color:var(--yellow2);font-weight:700}
+.tf-sel{
+  background:rgba(240,185,11,.12);border:1px solid rgba(240,185,11,.32);color:var(--yellow2);
+  padding:4px 8px;border-radius:5px;font-family:var(--font-ui);font-size:12px;font-weight:700;
+  cursor:pointer;outline:none;min-width:84px
+}
+.tf-sel option,.tf-sel optgroup{background:#121a26;color:#e6edf6;font-weight:500}
 #bubble-btn{
   display:flex;align-items:center;gap:5px;background:var(--surface3);
   border:1px solid var(--border2);color:var(--text2);padding:4px 10px;border-radius:6px;
@@ -427,7 +431,7 @@ body{
     padding:6px 10px;gap:6px 8px
   }
   .tf-grp{order:20;flex:1 1 100%;margin-left:0;gap:4px}
-  .tf-btn{flex:1;padding:7px 4px;font-size:12px;text-align:center}
+  .tf-sel{width:100%;height:40px;font-size:16px;padding:6px 10px}
   #chart-loading{order:21}
   .cstat{min-width:44px}
 
@@ -553,14 +557,7 @@ body{
       </div>
       <button id="mobile-panel-btn">📊 Analysis</button>
       <button id="bubble-btn" class="live"><span class="bubble-dot"></span>LIVE</button>
-      <div class="tf-grp">
-        <button class="tf-btn" data-tf="1m">1m</button>
-        <button class="tf-btn active" data-tf="5m">5m</button>
-        <button class="tf-btn" data-tf="15m">15m</button>
-        <button class="tf-btn" data-tf="1h">1h</button>
-        <button class="tf-btn" data-tf="4h">4h</button>
-        <button class="tf-btn" id="tf-custom" title="Custom timeframe">Custom</button>
-      </div>
+      <div class="tf-grp"><select id="tf-select" class="tf-sel" aria-label="Timeframe"></select></div>
       <span id="chart-loading"></span>
     </div>
     <div id="chart-body"><canvas id="chart-cv"></canvas><canvas id="crosshair-cv"></canvas></div>
@@ -980,11 +977,19 @@ function changeInterval(newTF){
   updateTFButtons();
   loadCandles();startCandleTimer();
 }
-function updateTFButtons(){let preset=false;document.querySelectorAll('.tf-btn[data-tf]').forEach(b=>{const on=b.dataset.tf===chartInterval;if(on)preset=true;b.classList.toggle('active',on);});const cb=document.getElementById('tf-custom');if(cb){cb.classList.toggle('active',!preset);cb.textContent=preset?'Custom':chartInterval;}}
-function askCustomTF(){let def='';try{def=localStorage.getItem('lh_custom_tf')||'';}catch(e){}
-  const v=prompt('Custom timeframe (examples: 7m, 10m, 45m, 2h, 3h). 1 minute to 1 day.',def||'10m');if(v===null)return;
-  const min=parseTF(v);if(!min){alert('Could not read that. Use a number of minutes or hours, e.g. 10m or 3h.');return;}
-  const name=tfName(min);try{localStorage.setItem('lh_custom_tf',name);}catch(e){}
+function getSavedTFs(){try{const a=JSON.parse(localStorage.getItem('lh_custom_tfs')||'[]');return Array.isArray(a)?a.filter(x=>parseTF(x)).slice(0,6):[];}catch(e){return[];}}
+function saveCustomTF(name){try{const a=[name,...getSavedTFs().filter(x=>x!==name)].slice(0,6);localStorage.setItem('lh_custom_tfs',JSON.stringify(a));}catch(e){}}
+function updateTFButtons(){const sel=document.getElementById('tf-select');if(!sel)return;
+  const nat=NATIVE_TF.map(x=>x[1]),extra=[...new Set([...getSavedTFs(),chartInterval])].filter(x=>!nat.includes(x));
+  let h='<optgroup label="Timeframes">'+nat.map(t=>`<option value="${t}">${t}</option>`).join('')+'</optgroup>';
+  if(extra.length)h+='<optgroup label="Custom">'+extra.map(t=>`<option value="${t}">${t}</option>`).join('')+'</optgroup>';
+  h+='<option value="__custom__">＋ Custom…</option>';
+  sel.innerHTML=h;sel.value=chartInterval;}
+function askCustomTF(){const last=getSavedTFs()[0]||'';
+  const v=prompt('Custom timeframe (examples: 7m, 10m, 45m, 2h, 3h). 1 minute to 1 day.',last||'10m');
+  if(v===null){updateTFButtons();return;}
+  const min=parseTF(v);if(!min){alert('Could not read that. Use a number of minutes or hours, e.g. 10m or 3h.');updateTFButtons();return;}
+  const name=tfName(min);if(!NATIVE_TF.some(x=>x[1]===name))saveCustomTF(name);
   changeInterval(name);updateTFButtons();}
 
 function resetAndConnect(){
@@ -1004,8 +1009,7 @@ function fmtV(v){const cs=currSym;if(v>=1e9)return cs+(v/1e9).toFixed(2)+'B';if(
 document.getElementById('thr-inp').addEventListener('input',function(){const v=parseInt(this.value);if(!isNaN(v)&&v>=100){if(isAutoThreshold){isAutoThreshold=false;updateAutoBtn(false);}THRESHOLD=v;prevWalls={bids:{},asks:{}};wallTimestamps={};renderStats();drawChart();}});
 document.getElementById('auto-thr-btn').addEventListener('click',()=>{isAutoThreshold=true;updateAutoBtn(true);needsAutoCalc=true;if(book.bids.length){calcAutoThreshold();renderStats();drawChart();}});
 document.getElementById('bubble-btn').addEventListener('click',toggleBubbleMode);
-document.querySelectorAll('.tf-btn[data-tf]').forEach(btn=>btn.addEventListener('click',()=>changeInterval(btn.dataset.tf)));
-document.getElementById('tf-custom').addEventListener('click',askCustomTF);
+document.getElementById('tf-select').addEventListener('change',e=>{const v=e.target.value;if(v==='__custom__')askCustomTF();else changeInterval(v);});updateTFButtons();
 document.getElementById('log-btn').addEventListener('click',()=>{logModalOpen?closeLogModal():openLogModal();});
 document.getElementById('log-close-btn').addEventListener('click',closeLogModal);
 document.getElementById('log-clear-btn').addEventListener('click',()=>{if(confirm('Clear all trade log entries?')){tradeLog=[];activeLogEntry=null;saveTradeLog();updateLogButtonUI();renderLogModal();}});
