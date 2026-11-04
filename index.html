@@ -887,7 +887,7 @@ function tfPlan(tf){const min=parseTF(tf)||5,nat=NATIVE_TF.find(x=>x[0]===min);i
 let viewN=120,viewEnd=0,_drawRaf=0;
 function scheduleDraw(){if(_drawRaf)return;_drawRaf=requestAnimationFrame(()=>{_drawRaf=0;try{drawChart();}catch(e){}});}
 function onCandlePushed(){if(viewEnd>0)viewEnd=Math.min(viewEnd+1,Math.max(0,candles.length-15));}
-function setView(newN,anchorX){const L=chartLayout;if(!L||!L.cW||!candles.length)return;const ax=Math.min(Math.max(anchorX,0),L.cW),aIdx=L.startI+Math.floor(ax/L.slotW);const maxN=Math.max(15,Math.min(400,Math.floor(L.cW/2.5),candles.length));newN=Math.round(Math.max(15,Math.min(maxN,newN)));const nsw=L.cW/newN,newStart=aIdx-Math.floor(ax/nsw),end=newStart+newN;viewN=newN;viewEnd=Math.max(0,Math.min(candles.length-end,candles.length-newN));scheduleDraw();}
+function setView(newN,anchorX){const L=chartLayout;if(!L||!L.cW||!candles.length)return;const ax=Math.min(Math.max(anchorX,0),L.plotW||L.cW),aIdx=L.startI+Math.floor(ax/L.slotW);const maxN=Math.max(15,Math.min(400,Math.floor(L.cW/2.5),candles.length));newN=Math.round(Math.max(15,Math.min(maxN,newN)));const nsw=(L.plotW||L.cW)/newN,newStart=aIdx-Math.floor(ax/nsw),end=newStart+newN;viewN=newN;viewEnd=Math.max(0,Math.min(candles.length-end,candles.length-newN));scheduleDraw();}
 function panView(startEnd,dx){const L=chartLayout;if(!L||!L.slotW)return;viewEnd=Math.max(0,Math.min(startEnd+Math.round(dx/L.slotW),Math.max(0,candles.length-L.N)));scheduleDraw();}
 let baseBuf=[],zoneBase=[],liqEvents=[];
 const LAYER_DEFS=[
@@ -1273,7 +1273,7 @@ function drawChart(){
   if(!candles.length){ctx.fillStyle='#5e7082';ctx.font='13px monospace';ctx.textAlign='center';ctx.fillText('Loading chart…',W/2,H/2);return;}
   const PW=68,LW=0,TH=18,VH=Math.round(H*0.10),cW=W-PW-LW,lS=cW,lE=W-PW,cAH=H-TH-VH;
   const N=Math.max(10,Math.min(viewN,Math.floor(cW/2.5),Math.max(candles.length,10)));if(viewEnd>Math.max(0,candles.length-N))viewEnd=Math.max(0,candles.length-N);if(viewEnd<0)viewEnd=0;
-  const slotW=cW/N,endI=candles.length-viewEnd,startI=Math.max(0,endI-N),vis=candles.slice(startI,endI),n=vis.length;
+  const padR=Math.round(Math.max(24,Math.min(cW*0.1,80))),plotW=cW-padR,slotW=plotW/N,endI=candles.length-viewEnd,startI=Math.max(0,endI-N),vis=candles.slice(startI,endI),n=vis.length;
   if(!n)return;
   const bW=Math.max(1.5,slotW*0.65);
   let hi=-Infinity,lo=Infinity,mV=0;
@@ -1283,7 +1283,7 @@ function drawChart(){
   if(tradeSetup){[tradeSetup.entry,tradeSetup.t1,tradeSetup.t2,tradeSetup.sl].forEach(p=>{if(p&&!isNaN(p)&&p>0){if(p>hi)hi=p;if(p<lo)lo=p;}});}
   const pad=(hi-lo)*.07;hi+=pad;lo-=pad;
   const pr=hi-lo||1,p2y=p=>((hi-p)/pr)*cAH;
-  chartHi=hi;chartLo=lo;chartLayout={cAH,cW,lE,PW,slotW,bW,H,N,startI,vis};
+  chartHi=hi;chartLo=lo;chartLayout={cAH,cW,lE,PW,slotW,bW,H,N,startI,vis,plotW};
   {const jb=document.getElementById('jump-latest');if(jb)jb.classList.toggle('show',viewEnd>0);}
   for(let i=0;i<=8;i++){const y=i*(cAH/8);ctx.strokeStyle=i===4?'#18233d':'#111a2e';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(cW,y);ctx.stroke();}
   if(layers.vpoc)drawVPOC(ctx,getVP(),p2y,cW,cAH);
