@@ -880,9 +880,9 @@ let candleTimerInterval=null;
 
 const INTERVAL_MS={'1m':60000,'5m':300000,'15m':900000,'1h':3600000,'4h':14400000};
 // ── Custom timeframes: built from the nearest smaller Binance interval ──
-const NATIVE_TF=[[1,'1m'],[3,'3m'],[5,'5m'],[15,'15m'],[30,'30m'],[60,'1h'],[120,'2h'],[240,'4h'],[360,'6h'],[480,'8h'],[720,'12h'],[1440,'1d']];
-function parseTF(str){const m=String(str||'').trim().toLowerCase().match(/^(\d{1,4})\s*(m|min|h|hr|d)?$/);if(!m)return null;const n=+m[1],u=m[2]||'m';const min=u[0]==='h'?n*60:u==='d'?n*1440:n;if(min<1||min>1440)return null;return min;}
-function tfName(min){if(min%1440===0)return(min/1440)+'d';if(min%60===0)return(min/60)+'h';return min+'m';}
+const NATIVE_TF=[[1,'1m'],[3,'3m'],[5,'5m'],[15,'15m'],[30,'30m'],[60,'1h'],[120,'2h'],[240,'4h'],[360,'6h'],[480,'8h'],[720,'12h'],[1440,'1d'],[4320,'3d'],[10080,'1w'],[43200,'1M']];
+function parseTF(str){const raw=String(str||'').trim();if(raw==='1M')return 43200;if(raw.toLowerCase()==='1w')return 10080;if(raw.toLowerCase()==='3d')return 4320;const m=String(str||'').trim().toLowerCase().match(/^(\d{1,4})\s*(m|min|h|hr|d)?$/);if(!m)return null;const n=+m[1],u=m[2]||'m';const min=u[0]==='h'?n*60:u==='d'?n*1440:n;if(min<1||min>1440)return null;return min;}
+function tfName(min){if(min===43200)return'1M';if(min===10080)return'1w';if(min%1440===0)return(min/1440)+'d';if(min%60===0)return(min/60)+'h';return min+'m';}
 function tfPlan(tf){const min=parseTF(tf)||5,nat=NATIVE_TF.find(x=>x[0]===min);if(nat)return{min,ms:min*60000,base:nat[1],baseMs:min*60000,ratio:1};let b=NATIVE_TF[0];for(const x of NATIVE_TF)if(x[0]<min&&min%x[0]===0)b=x;return{min,ms:min*60000,base:b[1],baseMs:b[0]*60000,ratio:min/b[0]};}
 let viewN=120,viewEnd=0,_drawRaf=0;
 // ── Footprint: buy / sell volume at each price inside each candle ──
@@ -950,18 +950,24 @@ function aggBuckets(list,plan){const out=[],ms=plan.ms;let cur=null;for(const k 
 function ivMs(tf){return INTERVAL_MS[tf]||(parseTF(tf)||5)*60000;}
 
 
-function getCandleRemaining(){const now=Date.now();const ms=ivMs(chartInterval);return ms-(now%ms);}
-function formatCandleTime(r){const s=Math.ceil(r/1000),m=Math.floor(s/60),sec=s%60;if(m>0)return`${m}:${sec.toString().padStart(2,'0')}`;return`${s}s`;}
+function candleSpan(){const now=Date.now(),tf=chartInterval;
+  if(tf==='1w'||tf==='3d'||tf==='1M'){const last=candles.length?candles[candles.length-1]:null;let open=last&&last.t<=now?last.t:null;
+    if(tf==='1M'){const d=new Date(open!==null?open:now);const y=d.getUTCFullYear(),m=d.getUTCMonth();const o=Date.UTC(y,m,1),e=Date.UTC(y,m+1,1);return{len:e-o,rem:Math.max(0,e-now)};}
+    const len=tf==='1w'?604800000:259200000;if(open===null)open=Math.floor((now-(tf==='1w'?345600000:0))/len)*len+(tf==='1w'?345600000:0);
+    while(open+len<=now)open+=len;return{len,rem:Math.max(0,open+len-now)};}
+  const ms=ivMs(tf);return{len:ms,rem:ms-(now%ms)};}
+function getCandleRemaining(){return candleSpan().rem;}
+function formatCandleTime(r){const s=Math.ceil(r/1000),m=Math.floor(s/60),sec=s%60;if(s>=86400){const d=Math.floor(s/86400),h=Math.floor(s%86400/3600);return d+'d '+h+'h';}if(m>0)return`${m}:${sec.toString().padStart(2,'0')}`;return`${s}s`;}
 function startCandleTimer(){if(candleTimerInterval)clearInterval(candleTimerInterval);candleTimerInterval=setInterval(tickCandleTimer,1000);tickCandleTimer();}
 function tickCandleTimer(){
-  const remaining=getCandleRemaining(),ms=ivMs(chartInterval),pct=remaining/ms,secs=Math.ceil(remaining/1000);
+  const sp=candleSpan(),remaining=sp.rem,ms=sp.len,pct=remaining/ms,secs=Math.ceil(remaining/1000);
   const el=document.getElementById('cs-candle'),progressEl=document.getElementById('candle-progress');
   if(el){el.textContent=formatCandleTime(remaining);if(secs<=10){el.className='cstat-val urgent';el.style.color='';}else if(pct<0.25){el.className='cstat-val warn';el.style.color='';}else{el.className='cstat-val';el.style.color='var(--green2)';}}
   if(progressEl){const col=secs<=10?'#ff5d7e':pct<0.25?'#f0b90b':'#2de0b8';progressEl.style.width=(pct*100)+'%';progressEl.style.background=col;}
 }
 function drawCandleTimer(ctx,cW,cAH,lE,PW,H,TH){
   if(!livePrice)return;
-  const remaining=getCandleRemaining(),ms=ivMs(chartInterval),pct=remaining/ms,secs=Math.ceil(remaining/1000),timeStr=formatCandleTime(remaining);
+  const sp=candleSpan(),remaining=sp.rem,ms=sp.len,pct=remaining/ms,secs=Math.ceil(remaining/1000),timeStr=formatCandleTime(remaining);
   const col=secs<=10?'#ff5d7e':pct<0.25?'#f0b90b':'#2de0b8';
   const liveY=((chartHi-livePrice)/(chartHi-chartLo))*cAH;
   if(liveY<0||liveY>cAH)return;
@@ -1380,7 +1386,7 @@ function drawChart(){
   const N=Math.max(layers.fp?4:10,Math.min(viewN,Math.floor(cW/2.5),Math.max(candles.length,10)));if(viewEnd>Math.max(0,candles.length-N))viewEnd=Math.max(0,candles.length-N);if(viewEnd<0)viewEnd=0;
   const padR=Math.round(Math.max(24,Math.min(cW*0.1,80))),plotW=cW-padR,slotW=plotW/N,endI=candles.length-viewEnd,startI=Math.max(0,endI-N),vis=candles.slice(startI,endI),n=vis.length;
   if(!n)return;
-  const bW=Math.max(1.5,slotW*0.65),fpMode=layers.fp?(slotW>=58?2:slotW>=14?1:0):0;
+  const bW=Math.max(1.5,slotW*0.65),fpMode=layers.fp&&tfPlan(chartInterval).min<=1440?(slotW>=58?2:slotW>=14?1:0):0;
   let hi=-Infinity,lo=Infinity,mV=0;
   vis.forEach(c=>{if(c.h>hi)hi=c.h;if(c.l<lo)lo=c.l;if(c.v>mV)mV=c.v;});mV=mV||1;
   if(layers.orders&&book.bids.length&&livePrice)[...book.bids,...book.asks].filter(o=>o.usd>=THRESHOLD).forEach(o=>{if(o.price>lo*.995&&o.price<hi*1.005){if(o.price>hi)hi=o.price;if(o.price<lo)lo=o.price;}});
@@ -1412,7 +1418,7 @@ function drawChart(){
   drawCandleTimer(ctx,cW,cAH,lE,PW,H,TH);
   ctx.fillStyle='#6b7d92';ctx.font='8px monospace';ctx.textAlign='center';
   const lbE=Math.max(1,Math.floor(n/8));
-  vis.forEach((c,i)=>{if(i%lbE!==0)return;const x=i*slotW+slotW/2,d=new Date(c.t);ctx.fillText(`${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`,x,H-4);});
+  vis.forEach((c,i)=>{if(i%lbE!==0)return;const x=i*slotW+slotW/2,d=new Date(c.t);ctx.fillText(tfPlan(chartInterval).min>=1440?(tfPlan(chartInterval).min>=43200?d.toLocaleString('en',{month:'short'})+' '+String(d.getFullYear()).slice(2):d.getDate()+' '+d.toLocaleString('en',{month:'short'})):`${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`,x,H-4);});
   redrawCrosshairCanvas();
 }
 
@@ -1433,7 +1439,7 @@ function updateTFButtons(){const sel=document.getElementById('tf-select');if(!se
   h+='<option value="__custom__">＋ Custom…</option>';
   sel.innerHTML=h;sel.value=chartInterval;}
 function askCustomTF(){const last=getSavedTFs()[0]||'';
-  const v=prompt('Custom timeframe (examples: 7m, 10m, 45m, 2h, 3h). 1 minute to 1 day.',last||'10m');
+  const v=prompt('Custom timeframe (examples: 7m, 10m, 45m, 2h, 3h). 1 minute to 1 day. Weekly and monthly are in the main list.',last||'10m');
   if(v===null){updateTFButtons();return;}
   const min=parseTF(v);if(!min){alert('Could not read that. Use a number of minutes or hours, e.g. 10m or 3h.');updateTFButtons();return;}
   const name=tfName(min);if(!NATIVE_TF.some(x=>x[1]===name))saveCustomTF(name);
