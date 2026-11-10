@@ -1,5 +1,14 @@
 <html data-type="html" data-identifier="dc3b6f66-93c0-4a98-8323-4a2388a7b419" data-title="Liquidity Hunter" data-version="61"><head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Liquidity Hunter</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a0e1a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="LiqHunter">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 </head>
 <body>
 <style>
@@ -1512,4 +1521,5 @@ initChartInteraction();
 startCandleTimer();
 loadAllBinancePairs().then(()=>{resetAndConnect();refreshAllPrices();});
 </script>
+<script>if('serviceWorker' in navigator&&location.protocol.startsWith('http')){window.addEventListener('load',()=>{try{navigator.serviceWorker.register('sw.js').catch(()=>{});}catch(e){}});}</script>
 </body></html>
